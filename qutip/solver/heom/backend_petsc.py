@@ -35,7 +35,10 @@ class PETScGatherHEOMRHS:
         self.mat.setType(PETSc.Mat.Type.MPIAIJ)
         
         # Preallocation estimate
-        max_connections = 50 * block
+        # A row in the HEOM matrix is coupled to itself (via L_sys) and its parents/children.
+        # Max nonzeros per row in a block is `block`. Assuming at most 5 hierarchy connections, 
+        # a safe estimate is block * 5. Bound it by global_size.
+        max_connections = min(global_size, block * 5)
         self.mat.setPreallocationNNZ((max_connections, max_connections))
         self.mat.setOption(PETSc.Mat.Option.NEW_NONZERO_ALLOCATION_ERR, False)
 
@@ -47,12 +50,19 @@ class PETScGatherHEOMRHS:
         row_indices = np.arange(row_blk * self._block_size, (row_blk + 1) * self._block_size, dtype=np.int32)
         col_indices = np.arange(col_blk * self._block_size, (col_blk + 1) * self._block_size, dtype=np.int32)
         
-        self.mat.setValues(row_indices, col_indices, op.as_scipy().todense(), addv=PETSc.InsertMode.ADD_VALUES)
+        sp_csr = op.as_scipy().tocsr()
+        for i in range(sp_csr.shape[0]):
+            start, end = sp_csr.indptr[i], sp_csr.indptr[i+1]
+            if start < end:
+                global_row = row_blk * self._block_size + i
+                global_cols = col_blk * self._block_size + sp_csr.indices[start:end]
+                vals = sp_csr.data[start:end]
+                self.mat.setValues([global_row], global_cols, vals, addv=PETSc.InsertMode.ADD_VALUES)
 
     def gather(self, L_sys=None):
         from petsc4py import PETSc
         if L_sys is not None and L_sys.isconstant:
-            L_sys_dense = L_sys(0).data.as_scipy().todense()
+            L_sys_csr = L_sys(0).data.as_scipy().tocsr()
             
             comm = PETSc.COMM_WORLD
             size = comm.getSize()
@@ -68,8 +78,13 @@ class PETScGatherHEOMRHS:
                 end_block = start_block + n_local_blocks
             
             for r_blk in range(start_block, end_block):
-                row_indices = np.arange(r_blk * self._block_size, (r_blk + 1) * self._block_size, dtype=np.int32)
-                self.mat.setValues(row_indices, row_indices, L_sys_dense, addv=PETSc.InsertMode.ADD_VALUES)
+                for i in range(L_sys_csr.shape[0]):
+                    start, end = L_sys_csr.indptr[i], L_sys_csr.indptr[i+1]
+                    if start < end:
+                        global_row = r_blk * self._block_size + i
+                        global_cols = r_blk * self._block_size + L_sys_csr.indices[start:end]
+                        vals = L_sys_csr.data[start:end]
+                        self.mat.setValues([global_row], global_cols, vals, addv=PETSc.InsertMode.ADD_VALUES)
                 
         self.mat.assemblyBegin()
         self.mat.assemblyEnd()

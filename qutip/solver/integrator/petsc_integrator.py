@@ -14,6 +14,10 @@ class IntegratorPETSc(Integrator):
         "max_steps": 100000,
         "atol": 1e-8,
         "rtol": 1e-6,
+        "ksp_type": "bcgs",
+        "pc_type": "bjacobi",
+        "ksp_atol": 1e-8,
+        "ksp_rtol": 1e-6,
     }
     
     support_time_dependant = False
@@ -48,9 +52,13 @@ class IntegratorPETSc(Integrator):
         # Configure the internal linear solver (KSP) for implicit methods
         snes = self.ts.getSNES()
         ksp = snes.getKSP()
-        ksp.setType("bcgs")
+        ksp.setType(self.options.get("ksp_type", "bcgs"))
         pc = ksp.getPC()
-        pc.setType("jacobi")
+        pc.setType(self.options.get("pc_type", "bjacobi"))
+        ksp.setTolerances(
+            atol=self.options.get("ksp_atol", 1e-8),
+            rtol=self.options.get("ksp_rtol", 1e-6)
+        )
         
         # Adaptivity is enabled automatically when tolerances are set
         
