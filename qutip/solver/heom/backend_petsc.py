@@ -36,10 +36,13 @@ class PETScGatherHEOMRHS:
         
         # Preallocation estimate
         # A row in the HEOM matrix is coupled to itself (via L_sys) and its parents/children.
-        # Max nonzeros per row in a block is `block`. Assuming at most 5 hierarchy connections, 
-        # a safe estimate is block * 5. Bound it by global_size.
-        max_connections = min(global_size, block * 5)
-        self.mat.setPreallocationNNZ((max_connections, max_connections))
+        # Max nonzeros per row in a block is much smaller than the full block size due to sparsity.
+        # We estimate at most 60 nonzeros in the diagonal portion and 60 in the off-diagonal portion
+        # to prevent out of memory errors for large blocks while avoiding reallocation overhead.
+        d_nnz = min(local_size, 60)
+        o_nnz = min(global_size - local_size, 60)
+        if o_nnz < 0: o_nnz = 0
+        self.mat.setPreallocationNNZ((d_nnz, o_nnz))
         self.mat.setOption(PETSc.Mat.Option.NEW_NONZERO_ALLOCATION_ERR, False)
 
     def add_op(self, row_he, col_he, op):

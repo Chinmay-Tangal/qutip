@@ -60,7 +60,14 @@ class IntegratorPETSc(Integrator):
             rtol=self.options.get("ksp_rtol", 1e-6)
         )
         
-        # Adaptivity is enabled automatically when tolerances are set
+        # Explicitly configure adaptivity via PETSc options dictionary
+        adapt_type = self.options.get("ts_adapt", "basic")
+        if adapt_type:
+            self.PETSc.Options().setValue("-ts_adapt_type", adapt_type)
+            
+        # Allow command-line options to override TS settings and apply our set values
+        self.ts.setFromOptions()
+
         
         # We need a PETSc Vec for the state
         rstart, rend = self.mat.getOwnershipRange()
