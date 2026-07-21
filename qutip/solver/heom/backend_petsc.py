@@ -65,7 +65,8 @@ class PETScGatherHEOMRHS:
     def gather(self, L_sys=None):
         from petsc4py import PETSc
         if L_sys is not None and L_sys.isconstant:
-            L_sys_csr = L_sys(0).data.as_scipy().tocsr()
+            from qutip.core import data as _data
+            L_sys_csr = _data.to(_data.CSR, L_sys(0).data).as_scipy()
             
             comm = PETSc.COMM_WORLD
             size = comm.getSize()

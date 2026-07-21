@@ -1266,11 +1266,16 @@ class HEOMSolver(Solver):
                     f"Initial state rho has dims {rho0.dims}"
                     f" but the system dims are {rho_dims}"
                 )
-            rho0_he = np.zeros([n ** 2 * self._n_ados], dtype=complex)
-            rho0_he[:n ** 2] = rho0.full().ravel('F')
-            rho0_he = _data.create(rho0_he)
+            if self.options.get("backend") == "petsc":
+                # For PETSc, we only create the dense array for the system state
+                # to save memory. The PETSc integrator will map this onto the global vector.
+                rho0_he = _data.create(rho0.full().ravel('F'))
+            else:
+                rho0_he = np.zeros([n ** 2 * self._n_ados], dtype=complex)
+                rho0_he[:n ** 2] = rho0.full().ravel('F')
+                rho0_he = _data.create(rho0_he)
 
-        if self.options["state_data_type"]:
+        if self.options.get("backend") != "petsc" and self.options["state_data_type"]:
             rho0_he = _data.to(self.options["state_data_type"], rho0_he)
 
         return rho0_he

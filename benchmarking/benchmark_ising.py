@@ -69,7 +69,16 @@ def run_benchmark():
         t0 = time.time()
         solver_csr = HEOMSolver(
             H, baths, max_depth=MAX_DEPTH, 
-            options={"backend": "csr", "store_ados": False, "progress_bar": None}
+            options={
+                "backend": "csr", 
+                "store_ados": True, 
+                "progress_bar": None,
+                "store_states": True,
+                "method": "bdf",
+                "atol": 1e-8,
+                "rtol": 1e-6,
+                "nsteps": 100000
+            }
         )
         t_asm_csr = time.time() - t0
         print(f"   [csr] Assembly Time      : {t_asm_csr:.4f} s")
@@ -80,6 +89,10 @@ def run_benchmark():
         res_csr = solver_csr.run(rho0, tlist, e_ops=e_ops)
         t_evo_csr = time.time() - t0
         print(f"   [csr] Evolution Time     : {t_evo_csr:.4f} s")
+        # print("\nInitial State")
+        # print(res_csr.states[0].full())
+        # print("\nfinal State")
+        # print(res_csr.states[-1].full())
         
     except Exception as e:
         import traceback

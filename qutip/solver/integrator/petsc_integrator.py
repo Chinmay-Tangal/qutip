@@ -96,13 +96,23 @@ class IntegratorPETSc(Integrator):
 
     def set_state(self, t, state0):
         # state0 is a qutip.Data object (usually Dense), we need to extract its values
-        # state0 represents the full hierarchy state
+        # state0 represents the full hierarchy state OR just the system state
         state_np = state0.to_array().flatten()
         
         rstart, rend = self.mat.getOwnershipRange()
-        local_state = state_np[rstart:rend]
+        self.vec.set(0.0) # Zero out the global vector first
         
-        self.vec.setValues(range(rstart, rend), local_state)
+        if len(state_np) == self.mat.getSize()[1]:
+            local_state = state_np[rstart:rend]
+            self.vec.setValues(range(rstart, rend), local_state)
+        elif len(state_np) == self.system.sys_size:
+            start_idx = max(0, rstart)
+            end_idx = min(self.system.sys_size, rend)
+            if start_idx < end_idx:
+                self.vec.setValues(range(start_idx, end_idx), state_np[start_idx:end_idx])
+        else:
+            raise ValueError(f"Unexpected state0 size: {len(state_np)}")
+            
         self.vec.assemblyBegin()
         self.vec.assemblyEnd()
         

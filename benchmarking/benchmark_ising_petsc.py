@@ -86,11 +86,14 @@ def run_benchmark():
             H, baths, max_depth=MAX_DEPTH, 
             options={
                 "backend": "petsc", 
-                "store_ados": False, 
+                "store_ados": True, 
                 "progress_bar": None,
+                "store_states": True,
                 "ts_type": "bdf",       # Use implicit solver for stiff ODEs
                 "ts_adapt": "basic",    # Enable adaptive step sizing
-                "nsteps": 10000
+                "atol": 1e-8,
+                "rtol": 1e-6,
+                "max_steps": 100000
             }
         )
         if comm is not None: comm.Barrier()
@@ -104,7 +107,10 @@ def run_benchmark():
         if comm is not None: comm.Barrier()
         t_evo_petsc = time.time() - t0
         print0(f"   [petsc] Evolution Time   : {t_evo_petsc:.4f} s")
-        
+        # print0("\nInitial State")
+        # print0(res_petsc.states[0].full())
+        # print0("\nfinal State")
+        # print0(res_petsc.states[-1].full())        
         if rank == 0:
             # Print PETSc stats
             ts = solver_petsc._integrator.ts
